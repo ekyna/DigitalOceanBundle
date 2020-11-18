@@ -101,10 +101,17 @@ class Configuration implements ConfigurationInterface
     {
         $node
             ->children()
-                ->arrayNode('usage')
+                ->arrayNode('assets')
                     ->addDefaultsIfNotSet()
                     ->children()
-                        ->scalarNode('bundles')->defaultNull()->end()
+                        ->scalarNode('space')
+                            ->info('The space name to use to deploy assets.')
+                            ->defaultNull()
+                        ->end()
+                        ->arrayNode('files')
+                            ->info('An array of files paths, relative to the public (or web) directory, to copy to the CDN.')
+                            ->scalarPrototype()->end()
+                        ->end()
                     ->end()
                 ->end()
             ->end();

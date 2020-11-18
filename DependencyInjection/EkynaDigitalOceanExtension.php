@@ -125,7 +125,7 @@ class EkynaDigitalOceanExtension extends Extension
      */
     public function configureCommands(array $config, ContainerBuilder $container): void
     {
-        if (empty($name = $config['usage']['bundles'])) {
+        if (empty($name = $config['assets']['space'])) {
             return;
         }
 
@@ -137,12 +137,17 @@ class EkynaDigitalOceanExtension extends Extension
 
         $id = Transliterator::urlize($name, '_');
 
-        $container
+        $definition = $container
             ->register(AssetsDeployCommand::class, AssetsDeployCommand::class)
             ->setArgument(0, new Reference("ekyna_digital_ocean.{$id}.filesystem"))
             ->setArgument(1, new Reference(Api::class))
             ->setArgument(2, $name)
+            ->setArgument(3, '%kernel.project_dir%/web')
             ->addTag('console.command')
             ->setPublic(false);
+
+        if (!empty($files = $config['assets']['files'])) {
+            $definition->addMethodCall('setFiles', [$files]);
+        }
     }
 }
