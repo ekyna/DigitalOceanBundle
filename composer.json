@@ -1,0 +1,31 @@
+{
+    "name": "ekyna/digital-ocean-bundle",
+    "description": "Deploy assets to digital ocean space CDN",
+    "type": "symfony-bundle",
+    "authors": [
+        {
+            "name": "Etienne Dauvergne",
+            "homepage": "https://ekyna.com"
+        }
+    ],
+    "keywords": [
+        "symfony",
+        "bundle",
+        "digital ocean",
+        "assets",
+        "cdn"
+    ],
+    "homepage": "https://github.com/ekyna/DigitalOceanBundle",
+    "license": "MIT",
+    "require": {
+        "php": ">=7.0",
+        "symfony/framework-bundle": "^3.0",
+        "league/flysystem-aws-s3-v3": "^1.0",
+        "guzzlehttp/guzzle": "^6.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ekyna\\Bundle\\DigitalOceanBundle\\": ""
+        }
+    }
+}
