@@ -6,6 +6,7 @@ use Ekyna\Bundle\DigitalOceanBundle\Service\CDNHelper;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Finder\Finder;
 
@@ -57,6 +58,14 @@ class AssetsDeployCommand extends Command
     }
 
     /**
+     * @inheritDoc
+     */
+    protected function configure()
+    {
+        $this->addOption('purge', 'p', InputOption::VALUE_NONE, 'Whether to purge CDN cache.', false);
+    }
+
+    /**
      * Sets the files.
      *
      * @param array $files
@@ -75,13 +84,14 @@ class AssetsDeployCommand extends Command
 
         $this->deployFiles($output);
 
-        $this->helper->purge();
+        if ($input->getOption('purge')) {
+            $this->helper->purge();
+        }
     }
 
     /**
      * Deploys bundles assets.
      *
-     * @param string          $prefix
      * @param OutputInterface $output
      */
     private function deployBundles(OutputInterface $output): void
