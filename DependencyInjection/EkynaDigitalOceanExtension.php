@@ -6,6 +6,7 @@ use Aws\S3\S3Client;
 use Behat\Transliterator\Transliterator;
 use Ekyna\Bundle\DigitalOceanBundle\Command\AssetsDeployCommand;
 use Ekyna\Bundle\DigitalOceanBundle\Service\Api;
+use Ekyna\Bundle\DigitalOceanBundle\Service\CDNHelper;
 use Ekyna\Bundle\DigitalOceanBundle\Service\Registry;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\AwsS3v3\AwsS3Adapter;
@@ -137,12 +138,18 @@ class EkynaDigitalOceanExtension extends Extension
 
         $id = Transliterator::urlize($name, '_');
 
-        $definition = $container
-            ->register(AssetsDeployCommand::class, AssetsDeployCommand::class)
+        $container
+            ->register(CDNHelper::class, CDNHelper::class)
             ->setArgument(0, new Reference("ekyna_digital_ocean.{$id}.filesystem"))
             ->setArgument(1, new Reference(Api::class))
             ->setArgument(2, $name)
-            ->setArgument(3, '%kernel.project_dir%/web')
+            ->setArgument(3, $config['assets']['mime_types'])
+            ->setPublic(false);
+
+        $definition = $container
+            ->register(AssetsDeployCommand::class, AssetsDeployCommand::class)
+            ->setArgument(0, new Reference(CDNHelper::class))
+            ->setArgument(1, '%kernel.project_dir%/web')
             ->addTag('console.command')
             ->setPublic(false);
 

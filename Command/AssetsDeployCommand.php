@@ -2,15 +2,12 @@
 
 namespace Ekyna\Bundle\DigitalOceanBundle\Command;
 
-use Ekyna\Bundle\DigitalOceanBundle\Service\Api;
-use League\Flysystem\Filesystem;
+use Ekyna\Bundle\DigitalOceanBundle\Service\CDNHelper;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Finder\Finder;
-use function file_get_contents;
 
 /**
  * Class AssetsDeployCommand
@@ -22,19 +19,9 @@ class AssetsDeployCommand extends Command
     protected static $defaultName = 'ekyna:digital-ocean:assets:deploy';
 
     /**
-     * @var Filesystem
+     * @var CDNHelper
      */
-    private $filesystem;
-
-    /**
-     * @var Api
-     */
-    private $api;
-
-    /**
-     * @var string
-     */
-    private $spaceName;
+    private $helper;
 
     /**
      * @var array
@@ -50,18 +37,14 @@ class AssetsDeployCommand extends Command
     /**
      * Constructor.
      *
-     * @param Filesystem $filesystem
-     * @param Api        $api
-     * @param string     $spaceName
-     * @param string     $publicDir
+     * @param CDNHelper $helper
+     * @param string    $publicDir
      */
-    public function __construct(Filesystem $filesystem, Api $api, string $spaceName, string $publicDir)
+    public function __construct(CDNHelper $helper, string $publicDir)
     {
-        $this->filesystem  = $filesystem;
-        $this->api         = $api;
-        $this->spaceName   = $spaceName;
-        $this->publicDir   = rtrim($publicDir, '/') . '/';
-        $this->files       = [];
+        $this->helper    = $helper;
+        $this->publicDir = rtrim($publicDir, '/') . '/';
+        $this->files     = [];
 
         parent::__construct();
     }
@@ -85,7 +68,7 @@ class AssetsDeployCommand extends Command
 
         $this->deployFiles($output);
 
-        $this->api->purgeSpace($this->spaceName);
+        $this->helper->purge();
     }
 
     private function deployBundles(OutputInterface $output): void
@@ -98,44 +81,38 @@ class AssetsDeployCommand extends Command
                 continue;
             }
 
-            $output->writeln($bundle->getName());
+            $output->write($bundle->getName() . ': ');
 
-            $assetDir    = 'bundles/' . preg_replace('/bundle$/', '', strtolower($bundle->getName())) . '/';
-            $assets      = Finder::create()->ignoreDotFiles(false)->files()->in($originDir);
-            $validDirs = $validAssets = [];
+            $assetDir = 'bundles/' . preg_replace('/bundle$/', '', strtolower($bundle->getName())) . '/';
+            $files    = Finder::create()->ignoreDotFiles(false)->in($originDir);
+            $assets   = $validDirs = $validAssets = [];
 
-            $progressBar = new ProgressBar($output, $assets->count());
+            foreach ($files as $file) {
+                $path = $assetDir . $file->getRelativePathName();
 
-            foreach ($assets as $asset) {
-                $path = $assetDir . $asset->getRelativePathName();
-
-                if ($asset->isDir()) {
+                if ($file->isDir()) {
                     $validDirs[] = $path;
                 } else {
-                    $validAssets[] = $path;
-                    $this->filesystem->write($path, $asset->getContents());
+                    $assets[$file->getPathname()] = $validAssets[] = $path;
                 }
-
-                $progressBar->advance();
             }
 
-            $progressBar->finish();
+            $this->helper->deploy($assets, function (bool $result) use ($output) {
+                $output->write($result ? '<info>+</info>' : '<error>!</error>');
+            });
+
+            $callback = function (bool $result) use ($output) {
+                $output->write($result ? '<info>-</info>' : '<error>!</error>');
+            };
+
+            if (!empty($dirs = array_diff($this->helper->list($assetDir, true), $validDirs))) {
+                $this->helper->deleteDirectories($dirs, $callback);
+            }
+            if (!empty($files = array_diff($this->helper->list($assetDir, false), $validAssets))) {
+                $this->helper->deleteFiles($files, $callback);
+            }
+
             $output->writeln('');
-
-            $assets = $this->filesystem->listContents($assetDir, true);
-            foreach ($assets as $object) {
-                $asset = $object['path'];
-
-                if ($object['type'] === 'dir') {
-                    if (in_array($asset, $validDirs, true)) {
-                        continue;
-                    }
-                } elseif (in_array($asset, $validAssets, true)) {
-                    continue;
-                }
-
-                $this->filesystem->delete($asset);
-            }
         }
     }
 
@@ -145,21 +122,22 @@ class AssetsDeployCommand extends Command
             return;
         }
 
-        $output->writeln('Files');
+        $output->write('Files: ');
 
-        $progressBar = new ProgressBar($output, count($this->files));
+        $files = [];
 
         foreach ($this->files as $path) {
             if (!is_file($filePath = $this->publicDir . $path)) {
                 throw new RuntimeException("File '$path' not found.");
             }
 
-            $this->filesystem->write($path, file_get_contents($filePath));
-
-            $progressBar->advance();
+            $files[$filePath] = $path;
         }
 
-        $progressBar->finish();
+        $this->helper->deploy($files, function (bool $result) use ($output) {
+            $output->write($result ? '<info>+</info>' : '<error>!</error>');
+        });
+
         $output->writeln('');
     }
 }

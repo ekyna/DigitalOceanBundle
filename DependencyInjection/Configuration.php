@@ -109,8 +109,27 @@ class Configuration implements ConfigurationInterface
                             ->defaultNull()
                         ->end()
                         ->arrayNode('files')
-                            ->info('An array of files paths, relative to the public (or web) directory, to copy to the CDN.')
+                            ->info(
+                                'An array of files paths, relative to the public ' .
+                                '(or web) directory, to copy to the CDN.'
+                            )
                             ->scalarPrototype()->end()
+                        ->end()
+                        ->arrayNode('mime_types')
+                            ->info(
+                                'An associative array used to override Content-Type metadata (extension: ' .
+                                'mime type), when mime type detection does not work properly.'
+                            )
+                            ->useAttributeAsKey('extension')
+                            ->scalarPrototype()->end()
+                            ->defaultValue([
+                                'woff'  => 'font/woff',
+                                'woff2' => 'font/woff2',
+                                'ttf'   => 'font/ttf',
+                                'otf'   => 'font/otf',
+                                'eot'   => 'application/vnd.ms-fontobject',
+                                'svg'   => 'image/svg+xml',
+                            ])
                         ->end()
                     ->end()
                 ->end()
