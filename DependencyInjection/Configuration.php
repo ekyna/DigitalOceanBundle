@@ -108,6 +108,10 @@ class Configuration implements ConfigurationInterface
                             ->info('The space name to use to deploy assets.')
                             ->defaultNull()
                         ->end()
+                        ->scalarNode('prefix')
+                            ->info('CDN assets root folder.')
+                            ->defaultNull()
+                        ->end()
                         ->arrayNode('files')
                             ->info(
                                 'An array of files paths, relative to the public ' .

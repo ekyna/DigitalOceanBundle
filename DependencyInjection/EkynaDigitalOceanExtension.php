@@ -4,6 +4,7 @@ namespace Ekyna\Bundle\DigitalOceanBundle\DependencyInjection;
 
 use Aws\S3\S3Client;
 use Behat\Transliterator\Transliterator;
+use Ekyna\Bundle\DigitalOceanBundle\Command\AssetsDeleteCommand;
 use Ekyna\Bundle\DigitalOceanBundle\Command\AssetsDeployCommand;
 use Ekyna\Bundle\DigitalOceanBundle\Service\Api;
 use Ekyna\Bundle\DigitalOceanBundle\Service\CDNHelper;
@@ -138,6 +139,7 @@ class EkynaDigitalOceanExtension extends Extension
 
         $id = Transliterator::urlize($name, '_');
 
+        // CDN Helper
         $container
             ->register(CDNHelper::class, CDNHelper::class)
             ->setArgument(0, new Reference("ekyna_digital_ocean.{$id}.filesystem"))
@@ -146,15 +148,24 @@ class EkynaDigitalOceanExtension extends Extension
             ->setArgument(3, $config['assets']['mime_types'])
             ->setPublic(false);
 
+        // Assets deploy command
         $definition = $container
             ->register(AssetsDeployCommand::class, AssetsDeployCommand::class)
             ->setArgument(0, new Reference(CDNHelper::class))
             ->setArgument(1, '%kernel.project_dir%/web')
+            ->setArgument(2, $config['assets']['prefix'])
             ->addTag('console.command')
             ->setPublic(false);
 
         if (!empty($files = $config['assets']['files'])) {
             $definition->addMethodCall('setFiles', [$files]);
         }
+
+        // Assets delete command
+        $container
+            ->register(AssetsDeleteCommand::class, AssetsDeleteCommand::class)
+            ->setArgument(0, new Reference("ekyna_digital_ocean.{$id}.filesystem"))
+            ->addTag('console.command')
+            ->setPublic(false);
     }
 }
