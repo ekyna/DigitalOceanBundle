@@ -62,7 +62,7 @@ class AssetsDeployCommand extends Command
      */
     protected function configure()
     {
-        $this->addOption('purge', 'p', InputOption::VALUE_NONE, 'Whether to purge CDN cache.', false);
+        $this->addOption('purge', 'p', InputOption::VALUE_NONE, 'Whether to purge CDN cache.');
     }
 
     /**
