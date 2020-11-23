@@ -91,7 +91,7 @@ class CDNHelper
 
             $extension = pathinfo($file, PATHINFO_EXTENSION);
 
-            if (isset($this->mimeTypes[$extension])) {
+            if (isset($this->config['mime_types'][$extension])) {
                 $options['mimetype'] = $this->config['mime_types'][$extension];
             }
 
