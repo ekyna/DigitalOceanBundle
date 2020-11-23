@@ -5,6 +5,7 @@ namespace Ekyna\Bundle\DigitalOceanBundle\Service;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemException;
+use LogicException;
 
 /**
  * Class SpaceHelper
@@ -24,14 +25,9 @@ class CDNHelper
     private $api;
 
     /**
-     * @var string
-     */
-    private $space;
-
-    /**
      * @var array
      */
-    private $mimeTypes;
+    private $config;
 
 
     /**
@@ -39,15 +35,22 @@ class CDNHelper
      *
      * @param Filesystem $filesystem
      * @param Api        $api
-     * @param string     $space
-     * @param array      $mimeTypes
+     * @param array      $config
      */
-    public function __construct(Filesystem $filesystem, Api $api, string $space, array $mimeTypes = [])
+    public function __construct(Filesystem $filesystem, Api $api, array $config)
     {
         $this->filesystem = $filesystem;
-        $this->api        = $api;
-        $this->space      = $space;
-        $this->mimeTypes  = $mimeTypes;
+        $this->api = $api;
+
+        $this->config = array_replace([
+            'space'       => null,
+            'mime_types ' => [],
+            'gzip'        => false,
+        ], $config);
+
+        if (empty($this->config['space'])) {
+            throw new LogicException("Config entry 'space' must be configured.");
+        }
     }
 
     /**
@@ -83,18 +86,24 @@ class CDNHelper
     {
         foreach ($files as $file => $path) {
             $options = [
-                'visibility'      => AdapterInterface::VISIBILITY_PUBLIC,
-                'ContentEncoding' => 'gzip',
+                'visibility' => AdapterInterface::VISIBILITY_PUBLIC,
             ];
 
             $extension = pathinfo($file, PATHINFO_EXTENSION);
 
             if (isset($this->mimeTypes[$extension])) {
-                $options['mimetype'] = $this->mimeTypes[$extension];
+                $options['mimetype'] = $this->config['mime_types'][$extension];
+            }
+
+            $content = file_get_contents($file);
+
+            if ($this->shouldGzip($extension)) {
+                $content = gzencode($content, 6);
+                $options['ContentEncoding'] = 'gzip';
             }
 
             try {
-                $result = $this->filesystem->write($path, file_get_contents($file), $options);
+                $result = $this->filesystem->write($path, $content, $options);
             } catch (FilesystemException $e) {
                 $result = false;
             }
@@ -103,6 +112,26 @@ class CDNHelper
                 $callback($result);
             }
         }
+    }
+
+    /**
+     * Returns whether the content should be gzipped for the given extension.
+     *
+     * @param string $extension
+     *
+     * @return bool
+     */
+    private function shouldGzip(string $extension): bool
+    {
+        if (is_bool($this->config['gzip']) && $this->config['gzip']) {
+            return true;
+        }
+
+        if (is_array($this->config['gzip']) && in_array($extension, $this->config['gzip'], true)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -154,6 +183,6 @@ class CDNHelper
      */
     public function purge(array $files = []): void
     {
-        $this->api->purgeSpace($this->space, $files);
+        $this->api->purgeSpace($this->config['space'], $files);
     }
 }

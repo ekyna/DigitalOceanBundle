@@ -135,6 +135,19 @@ class Configuration implements ConfigurationInterface
                                 'svg'   => 'image/svg+xml',
                             ])
                         ->end()
+                        ->variableNode('gzip')
+                            ->info(
+                                'An array of file extensions that will be gzipped. ' .
+                                'Tue or False to enable or disable for all file types.'
+                            )
+                            ->validate()
+                                ->ifTrue(function($value) {
+                                    return !is_bool($value) && !is_array($value);
+                                })
+                                ->thenInvalid("Configuration for 'gzip' must be a boolean or an array of extensions.")
+                            ->end()
+                            ->defaultFalse()
+                        ->end()
                     ->end()
                 ->end()
             ->end();

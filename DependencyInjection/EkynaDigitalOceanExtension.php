@@ -144,8 +144,11 @@ class EkynaDigitalOceanExtension extends Extension
             ->register(CDNHelper::class, CDNHelper::class)
             ->setArgument(0, new Reference("ekyna_digital_ocean.{$id}.filesystem"))
             ->setArgument(1, new Reference(Api::class))
-            ->setArgument(2, $name)
-            ->setArgument(3, $config['assets']['mime_types'])
+            ->setArgument(2, [
+                'space'      => $name,
+                'mime_types' => $config['assets']['mime_types'],
+                'gzip'       => $config['assets']['gzip'],
+            ])
             ->setPublic(false);
 
         // Assets deploy command
