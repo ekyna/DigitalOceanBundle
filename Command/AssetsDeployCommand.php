@@ -216,7 +216,7 @@ class AssetsDeployCommand extends Command
             $output->writeln('');
 
             if ($purge) {
-                $purgeList[] = rtrim($assetDir, '/');
+                $purgeList[] = $assetDir . '*';
             }
         }
 
@@ -256,7 +256,6 @@ class AssetsDeployCommand extends Command
         });
 
         $output->writeln('');
-
 
         if ($purge) {
             $output->write('Purging ... ');
