@@ -5,10 +5,13 @@ namespace Ekyna\Bundle\DigitalOceanBundle\Command;
 use Ekyna\Bundle\DigitalOceanBundle\Service\CDNHelper;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Exception\InvalidOptionException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\HttpKernel\Bundle\BundleInterface;
 
 /**
  * Class AssetsDeployCommand
@@ -39,6 +42,11 @@ class AssetsDeployCommand extends Command
      */
     private $files;
 
+    /**
+     * @var BundleInterface[]
+     */
+    private $bundles;
+
 
     /**
      * Constructor.
@@ -49,20 +57,12 @@ class AssetsDeployCommand extends Command
      */
     public function __construct(CDNHelper $helper, string $publicDir, string $prefix = null)
     {
-        $this->helper    = $helper;
+        $this->helper = $helper;
         $this->publicDir = rtrim($publicDir, '/') . '/';
-        $this->prefix    = empty($prefix) ? '' : trim($prefix, '/') . '/';
-        $this->files     = [];
+        $this->prefix = empty($prefix) ? '' : trim($prefix, '/') . '/';
+        $this->files = [];
 
         parent::__construct();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    protected function configure()
-    {
-        $this->addOption('purge', 'p', InputOption::VALUE_NONE, 'Whether to purge CDN cache.');
     }
 
     /**
@@ -78,37 +78,115 @@ class AssetsDeployCommand extends Command
     /**
      * @inheritDoc
      */
+    protected function configure()
+    {
+        $this
+            ->addOption(
+                'bundle',
+                'b',
+                InputOption::VALUE_IS_ARRAY | InputOption::VALUE_OPTIONAL,
+                'Filter which bundle(s) should be deployed on CDN.'
+            )
+            ->addOption(
+                'purge',
+                'p',
+                InputOption::VALUE_NONE,
+                'Whether to purge CDN cache.'
+            );
+    }
+
+    /**
+     * @inheritDoc
+     */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $this->deployBundles($output);
+        $filter = $input->getOption('bundle');
+        $purge = $input->getOption('purge');
 
-        $this->deployFiles($output);
+        // Load bundles with public directory.
+        /** @var \Symfony\Component\HttpKernel\KernelInterface $kernel */
+        $kernel = $this->getApplication()->getKernel();
+        $this->bundles = array_filter($kernel->getBundles(), function (BundleInterface $bundle) {
+            return is_dir($bundle->getPath() . '/Resources/public');
+        });
 
-        if ($input->getOption('purge')) {
-            $this->helper->purge();
+        // Check filter option consistency with bundles names.
+        $bundles = array_map(function (BundleInterface $bundle) {
+            return preg_replace('/bundle$/', '', strtolower($bundle->getName()));
+        }, $this->bundles);
+        $bundles[] = 'files';
+        if (!empty($filter)) {
+            $unknown = array_diff($filter, $bundles);
+            if (!empty($unknown)) {
+                throw new InvalidOptionException("Unknown bundles: " . implode(', ', $unknown));
+            }
         }
+
+        // Confirmation message
+        $message = '<info>Deploying</info>';
+        if ($purge) {
+            $message .= ' and <info>purging</info>';
+        }
+        if (empty($filter)) {
+            $message .= ' all assets';
+        } else {
+            $names = array_values(array_map(function (string $name) {
+                return "<comment>$name</comment>";
+            }, $filter));
+            $message .= ' ' . (
+                1 < count($names)
+                    ? implode(', ', array_slice($names, 0, -1)) . ' and ' . $names[count($names) - 1]
+                    : $names[0]
+                );
+
+        }
+        $message .= sprintf(' on <info>%s</info> CDN', $this->helper->getSpace());
+        if (!empty($this->prefix)) {
+            $message .= sprintf(' with prefix <info>%s</info>', trim($this->prefix, '/'));
+        }
+        $message .= '.';
+
+        $output->writeln($message);
+
+        $confirmation = new ConfirmationQuestion("Confirm deployment ?");
+        if (!$this->getHelper('question')->ask($input, $output, $confirmation)) {
+            $output->writeln('Abort by user.');
+
+            return 0;
+        }
+
+        $this->deployBundles($output, $filter, $purge);
+
+        if (empty($filter) || in_array('files', $filter, true)) {
+            $this->deployFiles($output, $purge);
+        }
+
+        return 0;
     }
 
     /**
      * Deploys bundles assets.
      *
      * @param OutputInterface $output
+     * @param array           $filter
+     * @param bool            $purge Whether to purge CDN cache.
      */
-    private function deployBundles(OutputInterface $output): void
+    private function deployBundles(OutputInterface $output, array $filter = [], bool $purge = false): void
     {
-        /** @var \Symfony\Component\HttpKernel\KernelInterface $kernel */
-        $kernel = $this->getApplication()->getKernel();
+        $purgeList = [];
 
-        foreach ($kernel->getBundles() as $bundle) {
-            if (!is_dir($originDir = $bundle->getPath() . '/Resources/public')) {
+        foreach ($this->bundles as $bundle) {
+            $bundleName = preg_replace('/bundle$/', '', strtolower($bundle->getName()));
+
+            if (!empty($filter) && !in_array($bundleName, $filter, true)) {
                 continue;
             }
 
             $output->write($bundle->getName() . ': ');
 
-            $assetDir = $this->prefix . 'bundles/' . preg_replace('/bundle$/', '', strtolower($bundle->getName())) . '/';
-            $files    = Finder::create()->ignoreDotFiles(false)->in($originDir);
-            $assets   = $validDirs = $validAssets = [];
+            $assetDir = $this->prefix . 'bundles/' . $bundleName . '/';
+            $files = Finder::create()->ignoreDotFiles(false)->in($bundle->getPath() . '/Resources/public');
+            $assets = $validDirs = $validAssets = [];
 
             foreach ($files as $file) {
                 $path = $assetDir . $file->getRelativePathName();
@@ -136,6 +214,16 @@ class AssetsDeployCommand extends Command
             }
 
             $output->writeln('');
+
+            if ($purge) {
+                $purgeList[] = rtrim($assetDir, '/');
+            }
+        }
+
+        if (!empty($purgeList)) {
+            $output->write('Purging ... ');
+            $this->helper->purge($purgeList);
+            $output->writeln('<info>done</info>');
         }
     }
 
@@ -143,8 +231,9 @@ class AssetsDeployCommand extends Command
      * Deploys extra files.
      *
      * @param OutputInterface $output
+     * @param bool            $purge
      */
-    private function deployFiles(OutputInterface $output): void
+    private function deployFiles(OutputInterface $output, bool $purge = false): void
     {
         if (empty($this->files)) {
             return;
@@ -167,5 +256,12 @@ class AssetsDeployCommand extends Command
         });
 
         $output->writeln('');
+
+
+        if ($purge) {
+            $output->write('Purging ... ');
+            $this->helper->purge(array_values($files));
+            $output->writeln('<info>done</info>');
+        }
     }
 }

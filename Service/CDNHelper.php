@@ -54,6 +54,16 @@ class CDNHelper
     }
 
     /**
+     * Returns the space name.
+     *
+     * @return string
+     */
+    public function getSpace(): string
+    {
+        return $this->config['space'];
+    }
+
+    /**
      * Lists the files (or directories) int he given path.
      *
      * @param string $path
