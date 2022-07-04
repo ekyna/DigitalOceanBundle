@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Ekyna\Bundle\DigitalOceanBundle\DependencyInjection;
 
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
@@ -13,27 +15,23 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
  */
 class Configuration implements ConfigurationInterface
 {
-    /**
-     * @inheritDoc
-     */
-    public function getConfigTreeBuilder()
+    public function getConfigTreeBuilder(): TreeBuilder
     {
-        $treeBuilder = new TreeBuilder();
-        $rootNode = $treeBuilder->root('ekyna_digital_ocean');
+        $builder = new TreeBuilder('ekyna_digital_ocean');
 
-        $this->addApiSection($rootNode);
-        $this->addSpaceSection($rootNode);
-        $this->addUsageSection($rootNode);
+        $root = $builder->getRootNode();
 
-        return $treeBuilder;
+        $this->addApiSection($root);
+        $this->addSpaceSection($root);
+        $this->addUsageSection($root);
+
+        return $builder;
     }
 
     /**
      * Adds the `api` section.
-     *
-     * @param ArrayNodeDefinition $node
      */
-    private function addApiSection(ArrayNodeDefinition $node)
+    private function addApiSection(ArrayNodeDefinition $node): void
     {
         $node
             ->children()
@@ -50,10 +48,8 @@ class Configuration implements ConfigurationInterface
 
     /**
      * Adds the `space` section.
-     *
-     * @param ArrayNodeDefinition $node
      */
-    private function addSpaceSection(ArrayNodeDefinition $node)
+    private function addSpaceSection(ArrayNodeDefinition $node): void
     {
         $node
             ->children()
@@ -94,10 +90,8 @@ class Configuration implements ConfigurationInterface
 
     /**
      * Adds the `usage` section.
-     *
-     * @param ArrayNodeDefinition $node
      */
-    private function addUsageSection(ArrayNodeDefinition $node)
+    private function addUsageSection(ArrayNodeDefinition $node): void
     {
         $node
             ->children()

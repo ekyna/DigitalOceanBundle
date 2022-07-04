@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Ekyna\Bundle\DigitalOceanBundle\Service;
 
-use League\Flysystem\AdapterInterface;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemException;
+use League\Flysystem\Visibility;
 use LogicException;
 
 /**
@@ -14,34 +16,13 @@ use LogicException;
  */
 class CDNHelper
 {
-    /**
-     * @var Filesystem
-     */
-    private $filesystem;
+    private readonly array $config;
 
-    /**
-     * @var Api
-     */
-    private $api;
-
-    /**
-     * @var array
-     */
-    private $config;
-
-
-    /**
-     * Constructor.
-     *
-     * @param Filesystem $filesystem
-     * @param Api        $api
-     * @param array      $config
-     */
-    public function __construct(Filesystem $filesystem, Api $api, array $config)
-    {
-        $this->filesystem = $filesystem;
-        $this->api = $api;
-
+    public function __construct(
+        private readonly Filesystem $filesystem,
+        private readonly Api        $api,
+        array                       $config
+    ) {
         $this->config = array_replace([
             'space'       => null,
             'mime_types ' => [],
@@ -53,23 +34,13 @@ class CDNHelper
         }
     }
 
-    /**
-     * Returns the space name.
-     *
-     * @return string
-     */
     public function getSpace(): string
     {
         return $this->config['space'];
     }
 
     /**
-     * Lists the files (or directories) int he given path.
-     *
-     * @param string $path
-     * @param bool   $dir
-     *
-     * @return array
+     * Lists the files (or directories) in the given path.
      */
     public function list(string $path, bool $dir = false): array
     {
@@ -88,15 +59,12 @@ class CDNHelper
 
     /**
      * Deploys the given files (local file => CDN path).
-     *
-     * @param array         $files
-     * @param callable|null $callback
      */
     public function deploy(array $files, callable $callback = null): void
     {
         foreach ($files as $file => $path) {
             $options = [
-                'visibility' => AdapterInterface::VISIBILITY_PUBLIC,
+                'visibility' => Visibility::PUBLIC,
             ];
 
             $extension = pathinfo($file, PATHINFO_EXTENSION);
@@ -113,8 +81,9 @@ class CDNHelper
             }
 
             try {
-                $result = $this->filesystem->write($path, $content, $options);
-            } catch (FilesystemException $e) {
+                $this->filesystem->write($path, $content, $options);
+                $result = true;
+            } catch (FilesystemException) {
                 $result = false;
             }
 
@@ -126,10 +95,6 @@ class CDNHelper
 
     /**
      * Returns whether the content should be gzipped for the given extension.
-     *
-     * @param string $extension
-     *
-     * @return bool
      */
     private function shouldGzip(string $extension): bool
     {
@@ -146,16 +111,14 @@ class CDNHelper
 
     /**
      * Deletes the given files.
-     *
-     * @param array         $paths
-     * @param callable|null $callback
      */
     public function deleteFiles(array $paths, callable $callback = null): void
     {
         foreach ($paths as $path) {
             try {
-                $result = $this->filesystem->delete($path);
-            } catch (FilesystemException $e) {
+                $this->filesystem->delete($path);
+                $result = true;
+            } catch (FilesystemException) {
                 $result = false;
             }
 
@@ -167,16 +130,14 @@ class CDNHelper
 
     /**
      * Deletes the given directories.
-     *
-     * @param array         $paths
-     * @param callable|null $callback
      */
     public function deleteDirectories(array $paths, callable $callback = null): void
     {
         foreach ($paths as $path) {
             try {
-                $result = $this->filesystem->deleteDir($path);
-            } catch (FilesystemException $e) {
+                $this->filesystem->deleteDirectory($path);
+                $result = true;
+            } catch (FilesystemException) {
                 $result = false;
             }
 
@@ -188,8 +149,6 @@ class CDNHelper
 
     /**
      * Purges the CDN cache.
-     *
-     * @param array $files
      */
     public function purge(array $files = []): void
     {

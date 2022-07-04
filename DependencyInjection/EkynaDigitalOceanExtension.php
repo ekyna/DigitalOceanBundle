@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Ekyna\Bundle\DigitalOceanBundle\DependencyInjection;
 
 use Aws\S3\S3Client;
@@ -9,9 +11,9 @@ use Ekyna\Bundle\DigitalOceanBundle\Command\AssetsDeployCommand;
 use Ekyna\Bundle\DigitalOceanBundle\Service\Api;
 use Ekyna\Bundle\DigitalOceanBundle\Service\CDNHelper;
 use Ekyna\Bundle\DigitalOceanBundle\Service\Registry;
-use League\Flysystem\AdapterInterface;
-use League\Flysystem\AwsS3v3\AwsS3Adapter;
+use League\Flysystem\AwsS3V3\AwsS3V3Adapter;
 use League\Flysystem\Filesystem;
+use League\Flysystem\Visibility;
 use LogicException;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -26,10 +28,7 @@ use Symfony\Component\HttpKernel\DependencyInjection\Extension;
  */
 class EkynaDigitalOceanExtension extends Extension
 {
-    /**
-     * @inheritDoc
-     */
-    public function load(array $configs, ContainerBuilder $container)
+    public function load(array $configs, ContainerBuilder $container): void
     {
         $config = $this->processConfiguration(new Configuration(), $configs);
 
@@ -43,9 +42,6 @@ class EkynaDigitalOceanExtension extends Extension
 
     /**
      * Configures the registry.
-     *
-     * @param array            $config
-     * @param ContainerBuilder $container
      */
     private function configureApi(array $config, ContainerBuilder $container): void
     {
@@ -57,9 +53,6 @@ class EkynaDigitalOceanExtension extends Extension
 
     /**
      * Configures the spaces filesystems.
-     *
-     * @param array            $config
-     * @param ContainerBuilder $container
      */
     private function configureSpaces(array $config, ContainerBuilder $container): void
     {
@@ -96,8 +89,8 @@ class EkynaDigitalOceanExtension extends Extension
             // Adapter
             $container
                 ->register(
-                    $adapterId = "ekyna_digital_ocean.{$id}.adapter",
-                    AwsS3Adapter::class
+                    $adapterId = "ekyna_digital_ocean.$id.adapter",
+                    AwsS3V3Adapter::class
                 )
                 ->setArgument(0, new Reference($clientId)) // Client
                 ->setArgument(1, $name)                    // Bucket
@@ -107,12 +100,12 @@ class EkynaDigitalOceanExtension extends Extension
             // Filesystem
             $container
                 ->register(
-                    "ekyna_digital_ocean.{$id}.filesystem",
+                    "ekyna_digital_ocean.$id.filesystem",
                     Filesystem::class
                 )
                 ->setArgument(0, new Reference($adapterId))
                 ->setArgument(1, [
-                    'visibility'      => AdapterInterface::VISIBILITY_PUBLIC,
+                    'visibility'      => Visibility::PUBLIC,
                     'disable_asserts' => true,
                 ])
                 ->setPublic(false);
@@ -121,9 +114,6 @@ class EkynaDigitalOceanExtension extends Extension
 
     /**
      * Configures the commands.
-     *
-     * @param array            $config
-     * @param ContainerBuilder $container
      */
     public function configureCommands(array $config, ContainerBuilder $container): void
     {
@@ -142,7 +132,7 @@ class EkynaDigitalOceanExtension extends Extension
         // CDN Helper
         $container
             ->register(CDNHelper::class, CDNHelper::class)
-            ->setArgument(0, new Reference("ekyna_digital_ocean.{$id}.filesystem"))
+            ->setArgument(0, new Reference("ekyna_digital_ocean.$id.filesystem"))
             ->setArgument(1, new Reference(Api::class))
             ->setArgument(2, [
                 'space'      => $name,
@@ -167,7 +157,7 @@ class EkynaDigitalOceanExtension extends Extension
         // Assets delete command
         $container
             ->register(AssetsDeleteCommand::class, AssetsDeleteCommand::class)
-            ->setArgument(0, new Reference("ekyna_digital_ocean.{$id}.filesystem"))
+            ->setArgument(0, new Reference("ekyna_digital_ocean.$id.filesystem"))
             ->addTag('console.command')
             ->setPublic(false);
     }

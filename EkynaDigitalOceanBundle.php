@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Ekyna\Bundle\DigitalOceanBundle;
 
 use Symfony\Component\HttpKernel\Bundle\Bundle;

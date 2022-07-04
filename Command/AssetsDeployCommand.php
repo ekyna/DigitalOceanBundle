@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Ekyna\Bundle\DigitalOceanBundle\Command;
 
 use Ekyna\Bundle\DigitalOceanBundle\Service\CDNHelper;
@@ -22,42 +24,18 @@ class AssetsDeployCommand extends Command
 {
     protected static $defaultName = 'ekyna:digital-ocean:assets:deploy';
 
-    /**
-     * @var CDNHelper
-     */
-    private $helper;
+    private string  $publicDir;
+    private ?string $prefix;
+    /** @var array<string> */
+    private array $files;
+    /** @var array<BundleInterface> */
+    private array $bundles;
 
-    /**
-     * @var array
-     */
-    private $publicDir;
-
-    /**
-     * @var string
-     */
-    private $prefix;
-
-    /**
-     * @var array
-     */
-    private $files;
-
-    /**
-     * @var BundleInterface[]
-     */
-    private $bundles;
-
-
-    /**
-     * Constructor.
-     *
-     * @param CDNHelper   $helper
-     * @param string      $publicDir
-     * @param string|null $prefix
-     */
-    public function __construct(CDNHelper $helper, string $publicDir, string $prefix = null)
-    {
-        $this->helper = $helper;
+    public function __construct(
+        private readonly CDNHelper $helper,
+        string                     $publicDir,
+        string                     $prefix = null
+    ) {
         $this->publicDir = rtrim($publicDir, '/') . '/';
         $this->prefix = empty($prefix) ? '' : trim($prefix, '/') . '/';
         $this->files = [];
@@ -65,20 +43,12 @@ class AssetsDeployCommand extends Command
         parent::__construct();
     }
 
-    /**
-     * Sets the files.
-     *
-     * @param array $files
-     */
     public function setFiles(array $files): void
     {
         $this->files = $files;
     }
 
-    /**
-     * @inheritDoc
-     */
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->addOption(
@@ -95,10 +65,7 @@ class AssetsDeployCommand extends Command
             );
     }
 
-    /**
-     * @inheritDoc
-     */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $filter = $input->getOption('bundle');
         $purge = $input->getOption('purge');
@@ -138,7 +105,6 @@ class AssetsDeployCommand extends Command
                     ? implode(', ', array_slice($names, 0, -1)) . ' and ' . $names[count($names) - 1]
                     : $names[0]
                 );
-
         }
         $message .= sprintf(' on <info>%s</info> CDN', $this->helper->getSpace());
         if (!empty($this->prefix)) {
@@ -148,7 +114,7 @@ class AssetsDeployCommand extends Command
 
         $output->writeln($message);
 
-        $confirmation = new ConfirmationQuestion("Confirm deployment ?");
+        $confirmation = new ConfirmationQuestion('Confirm deployment ?');
         if (!$this->getHelper('question')->ask($input, $output, $confirmation)) {
             $output->writeln('Abort by user.');
 
@@ -189,7 +155,7 @@ class AssetsDeployCommand extends Command
             $assets = $validDirs = $validAssets = [];
 
             foreach ($files as $file) {
-                $path = $assetDir . $file->getRelativePathName();
+                $path = $assetDir . $file->getRelativePathname();
 
                 if ($file->isDir()) {
                     $validDirs[] = $path;
@@ -229,9 +195,6 @@ class AssetsDeployCommand extends Command
 
     /**
      * Deploys extra files.
-     *
-     * @param OutputInterface $output
-     * @param bool            $purge
      */
     private function deployFiles(OutputInterface $output, bool $purge = false): void
     {

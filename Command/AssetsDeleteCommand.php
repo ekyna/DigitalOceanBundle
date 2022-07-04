@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Ekyna\Bundle\DigitalOceanBundle\Command;
 
 use League\Flysystem\Filesystem;
@@ -19,40 +21,23 @@ class AssetsDeleteCommand extends Command
 {
     protected static $defaultName = 'ekyna:digital-ocean:assets:delete';
 
-    /**
-     * @var Filesystem
-     */
-    private $filesystem;
-
-
-    /**
-     * Constructor.
-     *
-     * @param Filesystem $filesystem
-     */
-    public function __construct(Filesystem $filesystem)
+    public function __construct(private readonly Filesystem $filesystem)
     {
-        $this->filesystem = $filesystem;
-
         parent::__construct();
     }
 
-    /**
-     * @inheritDoc
-     */
-    protected function configure()
+    protected function configure(): void
     {
         $this->addArgument('path', InputArgument::REQUIRED, 'The CDN directory path to delete.');
     }
 
-    /**
-     * @inheritDoc
-     */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): void
     {
         $path = $input->getArgument('path');
 
-        if (!$this->filesystem->has($path)) {
+        try {
+            $this->filesystem->fileExists($path);
+        } catch (FilesystemException) {
             $output->writeln("<error>Path '$path' does not exist on space.</error>");
 
             return;
@@ -61,23 +46,19 @@ class AssetsDeleteCommand extends Command
         $question = new ConfirmationQuestion("Are you sure you want to delete '$path' from CDN ?", false);
         $helper   = $this->getHelper('question');
         if (!$helper->ask($input, $output, $question)) {
-            $output->writeln("<comment>Abort by user.</comment>");
+            $output->writeln('<comment>Abort by user.</comment>');
 
             return;
         }
 
         try {
-            $result = $this->filesystem->deleteDir($path);
-        } catch (FilesystemException $e) {
-            $result = false;
-        }
-
-        if ($result) {
-            $output->writeln("<info>Successfully delete '$path' from CDN.</info>");
+            $this->filesystem->deleteDirectory($path);
+        } catch (FilesystemException) {
+            $output->writeln("<error>Failed to delete '$path' from CDN.</error>");
 
             return;
         }
 
-        $output->writeln("<error>Failed to delete '$path' from CDN.</error>");
+        $output->writeln("<info>Successfully delete '$path' from CDN.</info>");
     }
 }
